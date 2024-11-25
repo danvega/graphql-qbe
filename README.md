@@ -12,6 +12,81 @@ This project showcases a robust implementation of a GraphQL API for managing boo
 - Docker Compose for local development
 - Comprehensive test coverage using TestContainers
 
+## Why Query by Example (QBE)?
+
+Query by Example significantly simplifies dynamic querying in your application. Here's a comparison of implementing the same search functionality with and without QBE:
+
+### Traditional Approach (Without QBE)
+
+```java
+@RestController
+@RequestMapping("/api/books")
+public class BookController {
+
+    @Autowired
+    private BookRepository bookRepository;
+    
+    @GetMapping("/search")
+    public List<Book> searchBooks(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String author,
+            @RequestParam(required = false) Integer publishedYear) {
+        
+        return bookRepository.findAll(new Specification<Book>() {
+            @Override
+            public Predicate toPredicate(Root<Book> root, CriteriaQuery<?> query, 
+                                       CriteriaBuilder cb) {
+                List<Predicate> predicates = new ArrayList<>();
+                
+                if (title != null) {
+                    predicates.add(cb.like(root.get("title"), "%" + title + "%"));
+                }
+                if (author != null) {
+                    predicates.add(cb.like(root.get("author"), "%" + author + "%"));
+                }
+                if (publishedYear != null) {
+                    predicates.add(cb.equal(root.get("publishedYear"), publishedYear));
+                }
+                
+                return cb.and(predicates.toArray(new Predicate[0]));
+            }
+        });
+    }
+}
+```
+
+### With Query by Example
+
+```java
+@GraphQlRepository
+public interface BookRepository extends JpaRepository<Book, Long>,
+QueryByExampleExecutor<Book> {
+}
+
+// GraphQL Query
+query {
+    books(book: {
+        author: "Craig Walls"
+        publishedYear: 2022
+    }) {
+        id
+                title
+        author
+                publishedYear
+    }
+}
+```
+
+
+**Benefits of QBE**
+
+- Reduced Boilerplate: Eliminates the need for complex specification classes or multiple repository methods
+- Type Safety: Provides compile-time type checking for your queries
+- Flexible Querying: Easily handle any combination of search criteria without writing custom methods
+- GraphQL Integration: Naturally fits with GraphQL's flexible query structure
+- Maintainable Code: Less code to maintain and test
+- Dynamic Queries: Handle multiple search parameters without complex conditional logic
+
 ## Project Requirements
 
 - Java 23
