@@ -55,6 +55,91 @@ public class BookController {
 }
 ```
 
+You can also write custom repository methods but this gets cluttered when you want to support every possible combination. 
+
+```java
+@Repository
+public interface BookRepository extends JpaRepository<Book, Long> {
+    
+    // Basic search methods
+    List<Book> findByTitle(String title);
+    List<Book> findByAuthor(String author);
+    List<Book> findByPublishedYear(Integer year);
+    
+    // Partial matches
+    List<Book> findByTitleContainingIgnoreCase(String title);
+    List<Book> findByAuthorContainingIgnoreCase(String author);
+    
+    // Multiple criteria - exact matches
+    List<Book> findByTitleAndAuthor(String title, String author);
+    List<Book> findByTitleAndPublishedYear(String title, Integer year);
+    List<Book> findByAuthorAndPublishedYear(String author, Integer year);
+    List<Book> findByTitleAndAuthorAndPublishedYear(String title, String author, Integer year);
+    
+    // Multiple criteria - partial matches
+    List<Book> findByTitleContainingIgnoreCaseAndAuthorContainingIgnoreCase(String title, String author);
+    List<Book> findByTitleContainingIgnoreCaseAndPublishedYear(String title, Integer year);
+    List<Book> findByAuthorContainingIgnoreCaseAndPublishedYear(String author, Integer year);
+    List<Book> findByTitleContainingIgnoreCaseAndAuthorContainingIgnoreCaseAndPublishedYear(
+        String title, String author, Integer year);
+    
+    // Ordered results
+    List<Book> findByPublishedYearOrderByTitleAsc(Integer year);
+    List<Book> findByAuthorOrderByPublishedYearDesc(String author);
+    List<Book> findByTitleContainingIgnoreCaseOrderByPublishedYearDesc(String title);
+    
+    // Complex queries with @Query
+    @Query("SELECT b FROM Book b WHERE b.publishedYear >= :startYear AND b.publishedYear <= :endYear")
+    List<Book> findBooksInYearRange(@Param("startYear") Integer startYear, @Param("endYear") Integer endYear);
+    
+    @Query("SELECT b FROM Book b WHERE LOWER(b.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(b.author) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<Book> findByTitleOrAuthorContaining(@Param("keyword") String keyword);
+    
+    // Pagination support
+    Page<Book> findByPublishedYear(Integer year, Pageable pageable);
+    Page<Book> findByAuthorContainingIgnoreCase(String author, Pageable pageable);
+    
+    // Count queries
+    Long countByPublishedYear(Integer year);
+    Long countByAuthor(String author);
+    
+    // Exists queries
+    boolean existsByTitleIgnoreCase(String title);
+    boolean existsByAuthorAndPublishedYear(String author, Integer year);
+    
+    // Delete queries
+    void deleteByPublishedYearBefore(Integer year);
+    
+    // Custom specification for complex dynamic queries
+    default List<Book> findByCustomCriteria(String title, String author, Integer yearFrom, Integer yearTo) {
+        return findAll((Specification<Book>) (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            if (title != null && !title.isEmpty()) {
+                predicates.add(cb.like(cb.lower(root.get("title")), 
+                    "%" + title.toLowerCase() + "%"));
+            }
+            
+            if (author != null && !author.isEmpty()) {
+                predicates.add(cb.like(cb.lower(root.get("author")), 
+                    "%" + author.toLowerCase() + "%"));
+            }
+            
+            if (yearFrom != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("publishedYear"), yearFrom));
+            }
+            
+            if (yearTo != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("publishedYear"), yearTo));
+            }
+            
+            return cb.and(predicates.toArray(new Predicate[0]));
+        });
+    }
+}
+```
+
 ### With Query by Example
 
 ```java
